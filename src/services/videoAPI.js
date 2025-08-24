@@ -28,6 +28,7 @@ export const videoAPI = {
   },
 
   // Search videos
+  // In videoAPI.js - Fix search endpoint
   searchVideos: (query, params = {}) => {
     const queryParams = new URLSearchParams({ q: query });
 

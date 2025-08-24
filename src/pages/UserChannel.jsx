@@ -102,28 +102,19 @@ const UserChannel = () => {
       return;
     }
 
-    if (user._id === channelData?.channel?._id) {
-      toast.error("You can't subscribe to your own channel");
-      return;
-    }
-
     try {
       setSubscribing(true);
 
       if (isSubscribed) {
-        await subscriptionAPI.unsubscribe(channelData.channel._id);
+        await subscriptionAPI.unsubscribe(channelId);
         setIsSubscribed(false);
         toast.success("Unsubscribed successfully!");
       } else {
-        await subscriptionAPI.subscribe(channelData.channel._id);
+        await subscriptionAPI.subscribe(channelId);
         setIsSubscribed(true);
         toast.success("Subscribed successfully!");
       }
-
-      // Refresh channel data to update subscriber count
-      fetchChannelData();
     } catch (error) {
-      console.error("Error toggling subscription:", error);
       toast.error("Failed to update subscription");
     } finally {
       setSubscribing(false);

@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { videoAPI } from "../services/videoAPI";
 import { likeAPI } from "../services/likeAPI";
 import { useAuth } from "../context/AuthContext";
-import  VideoPlayer  from "../components/video/VideoPlayer";
+import VideoPlayer from "../components/video/VideoPlayer";
 import CommentsSection from "../components/comments/CommentsSection";
 import VideoGrid from "../components/video/VideoGrid";
 import toast from "react-hot-toast";
@@ -21,6 +21,7 @@ import {
   HandThumbDownIcon as HandThumbDownSolid,
 } from "@heroicons/react/24/solid";
 import { formatDistanceToNow } from "date-fns";
+import { subscriptionAPI } from "../services/subscriptionAPI.js";
 
 const VideoWatch = () => {
   const { id } = useParams();
@@ -34,6 +35,8 @@ const VideoWatch = () => {
   const [disliked, setDisliked] = useState(false);
   const [likeProcessing, setLikeProcessing] = useState(false);
   const [showFullDescription, setShowFullDescription] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -70,29 +73,51 @@ const VideoWatch = () => {
     }
   };
 
+  // In VideoWatch.jsx - Fix like toggle
   const handleToggleLike = async () => {
     if (!user) {
       toast.error("Please login to like videos");
       return;
     }
 
-    if (likeProcessing) return;
-
     try {
       setLikeProcessing(true);
       await likeAPI.toggleVideoLike(id);
 
-      // Update local state optimistically
-      setLiked((prev) => !prev);
-      if (disliked) setDisliked(false);
+      // Refresh video to get updated like count
+      const response = await videoAPI.getVideoById(id);
+      setVideo(response.data.data);
 
-      // Refresh video data to get updated counts
-      fetchVideo();
-    } catch (err) {
-      console.error("Error toggling like:", err);
+      toast.success("Like updated!");
+    } catch (error) {
       toast.error("Failed to update like");
     } finally {
       setLikeProcessing(false);
+    }
+  };
+
+  const handleSubscribeToggle = async () => {
+    if (!user) {
+      toast.error("Please login to subscribe");
+      return;
+    }
+
+    try {
+      setSubscribing(true);
+
+      if (isSubscribed) {
+        await subscriptionAPI.unsubscribe(channelId);
+        setIsSubscribed(false);
+        toast.success("Unsubscribed successfully!");
+      } else {
+        await subscriptionAPI.subscribe(channelId);
+        setIsSubscribed(true);
+        toast.success("Subscribed successfully!");
+      }
+    } catch (error) {
+      toast.error("Failed to update subscription");
+    } finally {
+      setSubscribing(false);
     }
   };
 

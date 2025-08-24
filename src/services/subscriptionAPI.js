@@ -1,3 +1,4 @@
+// src/services/subscriptionAPI.js - Fix the API calls
 import apiClient from "./api";
 
 export const subscriptionAPI = {
@@ -8,14 +9,7 @@ export const subscriptionAPI = {
   unsubscribe: (channelId) =>
     apiClient.post("/users/unsubscribe", { channelId }),
 
-  // Get channel profile with stats
-  getChannelProfile: (channelId) =>
-    apiClient.get(`/users/channel/${channelId}`),
-
-  // Get user's subscribed channels
-  getSubscribedChannels: () => apiClient.get("/users/subscribed"),
-
-  // Get channel subscribers
-  getChannelSubscribers: (channelId) =>
-    apiClient.get(`/users/subscribers/${channelId}`),
+  // Check subscription status
+  checkSubscription: (channelId) =>
+    apiClient.get(`/users/subscription/${channelId}`),
 };

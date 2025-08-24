@@ -78,7 +78,7 @@ const Header = ({ sidebarOpen, setSidebarOpen }) => {
                   <PlayIcon className="w-5 h-5 text-white" />
                 </div>
                 <span className="text-xl font-bold text-gray-900 dark:text-white hidden sm:block">
-                  VideoTube
+                  Vidora
                 </span>
               </Link>
             </div>
