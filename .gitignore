@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+#sensetive
+*.env
+*.gitignore
+*.vite.config.js
+
