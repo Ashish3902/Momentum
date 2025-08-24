@@ -22,7 +22,7 @@ import {
 } from "@heroicons/react/24/solid";
 import { formatDistanceToNow } from "date-fns";
 import { subscriptionAPI } from "../services/subscriptionAPI.js";
-
+import SubscribeButton from "../components/ui/SubscribeButton";
 const VideoWatch = () => {
   const { id } = useParams();
   const { user } = useAuth();
@@ -272,11 +272,12 @@ const VideoWatch = () => {
                     </p>
                   </div>
                 </Link>
-
-                <button className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors">
-                  <UserPlusIcon className="w-5 h-5" />
-                  <span>Subscribe</span>
-                </button>
+                
+                <SubscribeButton
+                  channelId={video.owner._id}
+                  initialSubscribed={false} // You can fetch this from API
+                  initialCount={0} // You can fetch this from API
+                />
               </div>
 
               {/* Description */}

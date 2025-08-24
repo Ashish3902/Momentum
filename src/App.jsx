@@ -17,6 +17,13 @@ import SearchResults from "./pages/SearchResults";
 import UserChannel from "./pages/UserChannel";
 import UserProfile from "./pages/UserProfile";
 import CreatorStudio from "./pages/CreatorStudio";
+import Library from "./pages/Library.jsx";
+import About from "./pages/About.jsx";
+import Help from "./pages/Help.jsx";
+import Subscriptions from "./pages/Subscriptions.jsx";
+import Trending from "./pages/Trending.jsx";
+import History from "./pages/History.jsx";
+import WatchLater from "./pages/WatchLater.jsx";
 
 // Placeholder pages for remaining routes
 const TrendingPage = () => (
@@ -77,9 +84,19 @@ function App() {
                   <Route path="/watch/:id" element={<VideoWatch />} />
                   <Route path="/search" element={<SearchResults />} />
                   <Route path="/channel/:username" element={<UserChannel />} />
-                  <Route path="/trending" element={<TrendingPage />} />
+                  <Route path="/trending" element={<Trending />} />
+                  <Route path="/about" element={<About />} />
+                  <Route path="/help" element={<Help />} />
 
                   {/* Protected Routes */}
+                  <Route
+                    path="/library"
+                    element={
+                      <ProtectedRoute>
+                        <Library />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route
                     path="/upload"
                     element={
@@ -108,7 +125,7 @@ function App() {
                     path="/subscriptions"
                     element={
                       <ProtectedRoute>
-                        <SubscriptionsPage />
+                        <Subscriptions />
                       </ProtectedRoute>
                     }
                   />
@@ -117,6 +134,22 @@ function App() {
                     element={
                       <ProtectedRoute>
                         <LibraryPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/watch-later"
+                    element={
+                      <ProtectedRoute>
+                        <WatchLater />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/history"
+                    element={
+                      <ProtectedRoute>
+                        <History />
                       </ProtectedRoute>
                     }
                   />

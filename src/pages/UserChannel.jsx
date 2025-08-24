@@ -1,20 +1,22 @@
+// src/pages/UserChannel.jsx
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { videoAPI } from "../services/videoAPI";
+import { userAPI } from "../services/userAPI";
 import { subscriptionAPI } from "../services/subscriptionAPI";
+import { videoAPI } from "../services/videoAPI";
 import { useAuth } from "../context/AuthContext";
 import VideoGrid from "../components/video/VideoGrid";
 import toast from "react-hot-toast";
 import {
   UserPlusIcon,
   UserMinusIcon,
+  CheckBadgeIcon,
   PlayIcon,
   EyeIcon,
   CalendarIcon,
   MapPinIcon,
-  GlobeAltIcon,
-  CheckBadgeIcon,
+  CogIcon,
 } from "@heroicons/react/24/outline";
 import { formatDistanceToNow } from "date-fns";
 
@@ -23,74 +25,105 @@ const UserChannel = () => {
   const { user } = useAuth();
 
   const [channelData, setChannelData] = useState(null);
-  const [channelVideos, setChannelVideos] = useState([]);
+  const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [videosLoading, setVideosLoading] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
-  const [subscribing, setSubscribing] = useState(false);
+  const [subscriberCount, setSubscriberCount] = useState(0);
+  const [subscribeLoading, setSubscribeLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("videos");
-  const [videoPage, setVideoPage] = useState(1);
-  const [hasMoreVideos, setHasMoreVideos] = useState(true);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
   useEffect(() => {
     if (username) {
       fetchChannelData();
-      fetchChannelVideos(true);
     }
   }, [username]);
+
+  useEffect(() => {
+    if (channelData?._id) {
+      fetchVideos(true);
+      if (user && user._id !== channelData._id) {
+        checkSubscriptionStatus();
+      }
+    }
+  }, [channelData, user]);
 
   const fetchChannelData = async () => {
     try {
       setLoading(true);
-      // First get user by username (you might need to add this endpoint)
-      const userResponse = await videoAPI.searchUsers(username);
-      const foundUser = userResponse.data.data?.items?.find(
-        (u) => u.username === username
-      );
+      const response = await userAPI.getUserByUsername(username);
 
-      if (!foundUser) {
-        throw new Error("Channel not found");
+      if (!response.data?.data) {
+        throw new Error("User not found");
       }
 
-      // Get channel profile with stats
-      const channelResponse = await subscriptionAPI.getChannelProfile(
-        foundUser._id
-      );
-      setChannelData(channelResponse.data.data);
+      setChannelData(response.data.data);
 
-      // TODO: Check if current user is subscribed to this channel
+      // Get subscriber count
+      try {
+        const subResponse = await subscriptionAPI.getChannelSubscribers(
+          response.data.data._id,
+          { page: 1, limit: 1 }
+        );
+        setSubscriberCount(subResponse.data.data?.totalDocs || 0);
+      } catch (error) {
+        console.error("Error fetching subscriber count:", error);
+        setSubscriberCount(0);
+      }
     } catch (error) {
       console.error("Error fetching channel data:", error);
-      toast.error("Failed to load channel");
+      toast.error("Channel not found");
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchChannelVideos = async (reset = false) => {
+  const checkSubscriptionStatus = async () => {
+    if (!user || !channelData?._id) return;
+
+    try {
+      const isSubscribedStatus = await subscriptionAPI.checkSubscription(
+        channelData._id
+      );
+      setIsSubscribed(isSubscribedStatus);
+    } catch (error) {
+      console.error("Error checking subscription status:", error);
+      setIsSubscribed(false);
+    }
+  };
+
+  const fetchVideos = async (reset = false) => {
+    if (!channelData?._id) return;
+
     try {
       setVideosLoading(true);
-      const currentPage = reset ? 1 : videoPage;
+      const currentPage = reset ? 1 : page;
 
-      const response = await videoAPI.getUserVideos(channelData?.channel?._id, {
+      const params = {
         page: currentPage,
         limit: 12,
-        isPublished: user?._id === channelData?.channel?._id ? undefined : true, // Show all videos if own channel
-      });
+        sortBy: "createdAt",
+        sortType: "desc",
+        isPublished: user?._id === channelData._id ? undefined : true, // Show all if owner
+      };
 
+      const response = await videoAPI.getUserVideos(channelData._id, params);
       const newVideos = response.data.data?.docs || [];
 
       if (reset) {
-        setChannelVideos(newVideos);
-        setVideoPage(2);
+        setVideos(newVideos);
+        setPage(2);
       } else {
-        setChannelVideos((prev) => [...prev, ...newVideos]);
-        setVideoPage((prev) => prev + 1);
+        setVideos((prev) => [...prev, ...newVideos]);
+        setPage((prev) => prev + 1);
       }
 
-      setHasMoreVideos(response.data.data?.hasNextPage || false);
+      setHasMore(response.data.data?.hasNextPage || false);
     } catch (error) {
-      console.error("Error fetching channel videos:", error);
+      console.error("Error fetching videos:", error);
+      toast.error("Failed to load videos");
     } finally {
       setVideosLoading(false);
     }
@@ -102,22 +135,27 @@ const UserChannel = () => {
       return;
     }
 
-    try {
-      setSubscribing(true);
+    if (user._id === channelData._id) {
+      toast.error("You can't subscribe to your own channel");
+      return;
+    }
 
-      if (isSubscribed) {
-        await subscriptionAPI.unsubscribe(channelId);
-        setIsSubscribed(false);
-        toast.success("Unsubscribed successfully!");
-      } else {
-        await subscriptionAPI.subscribe(channelId);
-        setIsSubscribed(true);
-        toast.success("Subscribed successfully!");
+    try {
+      setSubscribeLoading(true);
+      const response = await subscriptionAPI.toggleSubscription(
+        channelData._id
+      );
+
+      if (response.data?.data) {
+        setIsSubscribed(response.data.data.isSubscribed);
+        setSubscriberCount(response.data.data.subscriberCount);
+        toast.success(response.data.message);
       }
     } catch (error) {
+      console.error("Error toggling subscription:", error);
       toast.error("Failed to update subscription");
     } finally {
-      setSubscribing(false);
+      setSubscribeLoading(false);
     }
   };
 
@@ -145,29 +183,33 @@ const UserChannel = () => {
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
             Channel not found
           </h2>
-          <Link to="/" className="text-blue-600 hover:text-blue-500">
-            Return to home
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            The channel you're looking for doesn't exist or may have been
+            removed.
+          </p>
+          <Link
+            to="/"
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Return to Home
           </Link>
         </div>
       </div>
     );
   }
 
-  const { channel, stats } = channelData;
-  const isOwnChannel = user?._id === channel._id;
+  const isOwnChannel = user?._id === channelData._id;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Cover Image */}
       <div className="relative h-48 sm:h-64 lg:h-80 bg-gradient-to-r from-blue-600 to-purple-600 overflow-hidden">
-        {channel.coverImage ? (
+        {channelData.coverImage && (
           <img
-            src={channel.coverImage}
-            alt={`${channel.fullName || channel.username} cover`}
+            src={channelData.coverImage}
+            alt={`${channelData.fullName || channelData.username} cover`}
             className="w-full h-full object-cover"
           />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-r from-blue-600 to-purple-600" />
         )}
         <div className="absolute inset-0 bg-black bg-opacity-30" />
       </div>
@@ -177,17 +219,17 @@ const UserChannel = () => {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative -mt-16 sm:-mt-20 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6"
+          className="relative -mt-16 sm:-mt-20 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8"
         >
           <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-6">
             {/* Avatar */}
             <div className="relative">
               <img
-                src={channel.avatar}
-                alt={channel.fullName || channel.username}
+                src={channelData.avatar}
+                alt={channelData.fullName || channelData.username}
                 className="w-24 h-24 sm:w-32 sm:h-32 rounded-full object-cover border-4 border-white dark:border-gray-700 shadow-lg"
               />
-              {channel.isEmailVerified && (
+              {channelData.isEmailVerified && (
                 <div className="absolute -bottom-1 -right-1 bg-blue-600 rounded-full p-1">
                   <CheckBadgeIcon className="w-6 h-6 text-white" />
                 </div>
@@ -199,115 +241,92 @@ const UserChannel = () => {
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                    {channel.fullName || channel.username}
+                    {channelData.fullName || channelData.username}
                   </h1>
                   <p className="text-gray-600 dark:text-gray-400 mb-2">
-                    @{channel.username}
+                    @{channelData.username}
                   </p>
 
                   {/* Stats */}
                   <div className="flex flex-wrap items-center space-x-6 text-sm text-gray-600 dark:text-gray-400 mb-4">
                     <div className="flex items-center">
                       <UserPlusIcon className="w-4 h-4 mr-1" />
-                      {formatNumber(stats.subscribers)} subscribers
+                      {formatNumber(subscriberCount)} subscribers
                     </div>
                     <div className="flex items-center">
                       <PlayIcon className="w-4 h-4 mr-1" />
-                      {formatNumber(stats.videos)} videos
+                      {videos.length} videos
                     </div>
                     <div className="flex items-center">
                       <CalendarIcon className="w-4 h-4 mr-1" />
                       Joined{" "}
-                      {formatDistanceToNow(new Date(channel.createdAt), {
+                      {formatDistanceToNow(new Date(channelData.createdAt), {
                         addSuffix: true,
                       })}
                     </div>
                   </div>
 
-                  {/* Location */}
-                  {channel.location && (
-                    <div className="flex items-center text-sm text-gray-600 dark:text-gray-400 mb-2">
-                      <MapPinIcon className="w-4 h-4 mr-1" />
-                      {channel.location}
-                    </div>
+                  {/* Bio */}
+                  {channelData.bio && (
+                    <p className="text-gray-700 dark:text-gray-300 max-w-2xl">
+                      {channelData.bio}
+                    </p>
                   )}
-
-                  {/* Social Links */}
-                  {channel.social &&
-                    Object.keys(channel.social).some(
-                      (key) => channel.social[key]
-                    ) && (
-                      <div className="flex items-center space-x-4">
-                        {channel.social.website && (
-                          <a
-                            href={channel.social.website}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-500 transition-colors"
-                          >
-                            <GlobeAltIcon className="w-5 h-5" />
-                          </a>
-                        )}
-                        {/* Add more social links as needed */}
-                      </div>
-                    )}
                 </div>
 
-                {/* Subscribe Button */}
-                {!isOwnChannel && (
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={handleSubscribeToggle}
-                    disabled={subscribing}
-                    className={`flex items-center space-x-2 px-6 py-3 rounded-full font-medium transition-all ${
-                      isSubscribed
-                        ? "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
-                        : "bg-red-600 text-white hover:bg-red-700"
-                    }`}
-                  >
-                    {isSubscribed ? (
-                      <>
-                        <UserMinusIcon className="w-5 h-5" />
-                        <span>
-                          {subscribing ? "Unsubscribing..." : "Subscribed"}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <UserPlusIcon className="w-5 h-5" />
-                        <span>
-                          {subscribing ? "Subscribing..." : "Subscribe"}
-                        </span>
-                      </>
-                    )}
-                  </motion.button>
-                )}
-
-                {isOwnChannel && (
-                  <Link
-                    to="/studio"
-                    className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-full font-medium hover:bg-blue-700 transition-colors"
-                  >
-                    <span>Manage Channel</span>
-                  </Link>
-                )}
+                {/* Action Buttons */}
+                <div className="flex items-center space-x-3 mt-4 sm:mt-0">
+                  {!isOwnChannel ? (
+                    <motion.button
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={handleSubscribeToggle}
+                      disabled={subscribeLoading}
+                      className={`flex items-center space-x-2 px-6 py-3 rounded-full font-medium transition-all ${
+                        isSubscribed
+                          ? "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                          : "bg-red-600 text-white hover:bg-red-700"
+                      } ${
+                        subscribeLoading ? "opacity-50 cursor-not-allowed" : ""
+                      }`}
+                    >
+                      {subscribeLoading ? (
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current"></div>
+                      ) : (
+                        <>
+                          {isSubscribed ? (
+                            <UserMinusIcon className="w-5 h-5" />
+                          ) : (
+                            <UserPlusIcon className="w-5 h-5" />
+                          )}
+                          <span>
+                            {isSubscribed ? "Subscribed" : "Subscribe"}
+                          </span>
+                          {subscriberCount > 0 && (
+                            <span className="bg-black bg-opacity-20 px-2 py-1 rounded-full text-xs">
+                              {formatNumber(subscriberCount)}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </motion.button>
+                  ) : (
+                    <Link
+                      to="/studio"
+                      className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-full font-medium hover:bg-blue-700 transition-colors"
+                    >
+                      <CogIcon className="w-5 h-5" />
+                      <span>Manage Channel</span>
+                    </Link>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-
-          {/* Bio */}
-          {channel.bio && (
-            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-              <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                {channel.bio}
-              </p>
-            </div>
-          )}
         </motion.div>
 
         {/* Tabs */}
-        <div className="mt-8">
+        <div className="mb-8">
           <div className="border-b border-gray-200 dark:border-gray-700">
             <nav className="flex space-x-8">
               {["videos", "about"].map((tab) => (
@@ -328,7 +347,7 @@ const UserChannel = () => {
         </div>
 
         {/* Tab Content */}
-        <div className="mt-8 pb-12">
+        <div className="pb-12">
           {activeTab === "videos" && (
             <motion.div
               key="videos"
@@ -337,17 +356,17 @@ const UserChannel = () => {
               transition={{ duration: 0.3 }}
             >
               <VideoGrid
-                videos={channelVideos}
-                loading={videosLoading && videoPage === 1}
+                videos={videos}
+                loading={videosLoading && page === 1}
               />
 
               {/* Load More Videos */}
-              {hasMoreVideos && !videosLoading && (
+              {hasMore && !videosLoading && (
                 <div className="text-center mt-12">
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => fetchChannelVideos(false)}
+                    onClick={() => fetchVideos(false)}
                     className="px-8 py-3 bg-blue-600 text-white rounded-full font-medium hover:bg-blue-700 transition-colors shadow-lg"
                   >
                     Load More Videos
@@ -356,14 +375,14 @@ const UserChannel = () => {
               )}
 
               {/* Loading More */}
-              {videosLoading && videoPage > 1 && (
+              {videosLoading && page > 1 && (
                 <div className="flex justify-center mt-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 </div>
               )}
 
               {/* No Videos */}
-              {channelVideos.length === 0 && !videosLoading && (
+              {videos.length === 0 && !videosLoading && (
                 <div className="text-center py-12">
                   <PlayIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
                   <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
@@ -401,13 +420,13 @@ const UserChannel = () => {
 
               <div className="space-y-6">
                 {/* Description */}
-                {channel.bio && (
+                {channelData.bio && (
                   <div>
                     <h4 className="font-medium text-gray-900 dark:text-white mb-2">
                       Description
                     </h4>
                     <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                      {channel.bio}
+                      {channelData.bio}
                     </p>
                   </div>
                 )}
@@ -420,7 +439,7 @@ const UserChannel = () => {
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                     <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                       <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {formatNumber(stats.subscribers)}
+                        {formatNumber(subscriberCount)}
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400">
                         Subscribers
@@ -428,7 +447,7 @@ const UserChannel = () => {
                     </div>
                     <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                       <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {formatNumber(stats.videos)}
+                        {videos.length}
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400">
                         Videos
@@ -436,7 +455,7 @@ const UserChannel = () => {
                     </div>
                     <div className="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
                       <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                        {formatDistanceToNow(new Date(channel.createdAt))}
+                        {formatDistanceToNow(new Date(channelData.createdAt))}
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400">
                         Channel Age
@@ -445,47 +464,20 @@ const UserChannel = () => {
                   </div>
                 </div>
 
-                {/* Links */}
-                {channel.social &&
-                  Object.keys(channel.social).some(
-                    (key) => channel.social[key]
-                  ) && (
-                    <div>
-                      <h4 className="font-medium text-gray-900 dark:text-white mb-4">
-                        Links
-                      </h4>
-                      <div className="space-y-2">
-                        {Object.entries(channel.social).map(
-                          ([platform, url]) =>
-                            url && (
-                              <a
-                                key={platform}
-                                href={url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center text-blue-600 hover:text-blue-500 transition-colors"
-                              >
-                                <GlobeAltIcon className="w-4 h-4 mr-2" />
-                                {platform.charAt(0).toUpperCase() +
-                                  platform.slice(1)}
-                              </a>
-                            )
-                        )}
-                      </div>
-                    </div>
-                  )}
-
                 {/* Join Date */}
                 <div>
                   <h4 className="font-medium text-gray-900 dark:text-white mb-2">
                     Joined
                   </h4>
                   <p className="text-gray-700 dark:text-gray-300">
-                    {new Date(channel.createdAt).toLocaleDateString("en-US", {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
+                    {new Date(channelData.createdAt).toLocaleDateString(
+                      "en-US",
+                      {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      }
+                    )}
                   </p>
                 </div>
               </div>
