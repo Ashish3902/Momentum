@@ -1,23 +1,32 @@
+// src/components/video/VideoGrid.jsx - Fixed with unique keys
 import React from "react";
-import { motion } from "framer-motion";
 import VideoCard from "./VideoCard";
 
-const VideoGrid = ({ videos, loading = false, className = "" }) => {
+const VideoGrid = ({
+  videos,
+  loading,
+  showRemoveFromWatchLater,
+  onRemoveFromWatchLater,
+  showRemoveFromHistory,
+  onRemoveFromHistory,
+  listType = "default", // ✅ Add context for unique keys
+}) => {
+  // ✅ Generate unique key function
+  const generateUniqueKey = (video, index, context) => {
+    if (video._id) {
+      return `${context}-${video._id}-${index}`;
+    }
+    return `${context}-${index}`;
+  };
+
   if (loading) {
     return (
-      <div
-        className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 ${className}`}
-      >
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {Array.from({ length: 8 }).map((_, index) => (
-          <div key={index} className="animate-pulse">
-            <div className="bg-gray-300 dark:bg-gray-700 aspect-video rounded-xl mb-4"></div>
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
-              <div className="flex-1">
-                <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded mb-2"></div>
-                <div className="h-3 bg-gray-300 dark:bg-gray-700 rounded w-2/3"></div>
-              </div>
-            </div>
+          <div key={`skeleton-${listType}-${index}`} className="animate-pulse">
+            <div className="bg-gray-300 aspect-video rounded-lg mb-4"></div>
+            <div className="bg-gray-300 h-4 rounded mb-2"></div>
+            <div className="bg-gray-300 h-3 rounded w-3/4"></div>
           </div>
         ))}
       </div>
@@ -27,31 +36,29 @@ const VideoGrid = ({ videos, loading = false, className = "" }) => {
   if (!videos || videos.length === 0) {
     return (
       <div className="text-center py-12">
-        <div className="text-gray-500 dark:text-gray-400 text-lg">
-          No videos found
-        </div>
+        <p className="text-gray-500 dark:text-gray-400">No videos found</p>
       </div>
     );
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
-      className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 ${className}`}
-    >
-      {videos.map((video, index) => (
-        <motion.div
-          key={video._id}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: index * 0.1 }}
-        >
-          <VideoCard video={video} />
-        </motion.div>
-      ))}
-    </motion.div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      {videos.map((video, index) => {
+        // ✅ FIXED: Create unique key combining context + id + index
+        const uniqueKey = generateUniqueKey(video, index, listType);
+
+        return (
+          <VideoCard
+            key={uniqueKey} // ✅ Now truly unique across all contexts
+            video={video}
+            showRemoveFromWatchLater={showRemoveFromWatchLater}
+            onRemoveFromWatchLater={onRemoveFromWatchLater}
+            showRemoveFromHistory={showRemoveFromHistory}
+            onRemoveFromHistory={onRemoveFromHistory}
+          />
+        );
+      })}
+    </div>
   );
 };
 

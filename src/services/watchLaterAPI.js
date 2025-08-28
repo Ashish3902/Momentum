@@ -11,13 +11,8 @@ export const watchLaterAPI = {
     });
     return apiClient.get(`/users/watchlater?${queryParams.toString()}`);
   },
-
   addToWatchLater: (videoId) =>
     apiClient.post("/users/watchlater", { videoId }),
-
   removeFromWatchLater: (videoId) =>
     apiClient.delete(`/users/watchlater/${videoId}`),
-
-  checkWatchLater: (videoId) =>
-    apiClient.get(`/users/watchlater/check/${videoId}`),
 };

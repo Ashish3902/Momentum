@@ -11,10 +11,7 @@ export const historyAPI = {
     });
     return apiClient.get(`/users/history?${queryParams.toString()}`);
   },
-
   addToHistory: (videoId) => apiClient.post("/users/history", { videoId }),
-
   removeFromHistory: (videoId) => apiClient.delete(`/users/history/${videoId}`),
-
   clearHistory: () => apiClient.delete("/users/history"),
 };

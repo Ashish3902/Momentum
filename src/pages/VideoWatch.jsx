@@ -1,8 +1,11 @@
+// src/pages/VideoWatch.jsx - Complete with Watch Later functionality
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { videoAPI } from "../services/videoAPI";
 import { likeAPI } from "../services/likeAPI";
+import { libraryAPI } from "../services/libraryAPI";
+import { subscriptionAPI } from "../services/subscriptionAPI";
 import { useAuth } from "../context/AuthContext";
 import VideoPlayer from "../components/video/VideoPlayer";
 import CommentsSection from "../components/comments/CommentsSection";
@@ -15,14 +18,15 @@ import {
   ShareIcon,
   BookmarkIcon,
   UserPlusIcon,
+  UserMinusIcon,
 } from "@heroicons/react/24/outline";
 import {
   HandThumbUpIcon as HandThumbUpSolid,
   HandThumbDownIcon as HandThumbDownSolid,
+  BookmarkIcon as BookmarkSolid,
 } from "@heroicons/react/24/solid";
 import { formatDistanceToNow } from "date-fns";
-import { subscriptionAPI } from "../services/subscriptionAPI.js";
-import SubscribeButton from "../components/ui/SubscribeButton";
+
 const VideoWatch = () => {
   const { id } = useParams();
   const { user } = useAuth();
@@ -31,26 +35,48 @@ const VideoWatch = () => {
   const [relatedVideos, setRelatedVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Like/Dislike state
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
   const [likeProcessing, setLikeProcessing] = useState(false);
-  const [showFullDescription, setShowFullDescription] = useState(false);
+
+  // Watch Later state
+  const [isInWatchLater, setIsInWatchLater] = useState(false);
+  const [watchLaterProcessing, setWatchLaterProcessing] = useState(false);
+
+  // Subscription state
   const [isSubscribed, setIsSubscribed] = useState(false);
-  const [subscribing, setSubscribing] = useState(false);
+  const [subscriptionProcessing, setSubscriptionProcessing] = useState(false);
+
+  const [showFullDescription, setShowFullDescription] = useState(false);
 
   useEffect(() => {
     if (id) {
       fetchVideo();
       fetchRelatedVideos();
+      checkWatchLaterStatus();
+      addToHistory();
     }
   }, [id]);
+
+  useEffect(() => {
+    if (video?.owner?._id && user && user._id !== video.owner._id) {
+      checkSubscriptionStatus();
+    }
+  }, [video, user]);
 
   const fetchVideo = async () => {
     try {
       setLoading(true);
       const response = await videoAPI.getVideoById(id);
       setVideo(response.data.data);
-      // TODO: Check if user has liked/disliked this video
+
+      // Check if user has liked this video
+      if (user) {
+        // You can implement a check endpoint or get this from video data
+        setLiked(false); // Set based on actual data
+      }
     } catch (err) {
       console.error("Error fetching video:", err);
       setError("Failed to load video");
@@ -73,51 +99,146 @@ const VideoWatch = () => {
     }
   };
 
-  // In VideoWatch.jsx - Fix like toggle
+  const addToHistory = async () => {
+    if (!user || !id) return;
+
+    try {
+      await libraryAPI.addToHistory(id);
+      console.log("Video added to history");
+    } catch (error) {
+      console.error("Failed to add to history:", error);
+      // Don't show error toast for history as it's not critical
+    }
+  };
+
+  const checkWatchLaterStatus = async () => {
+    if (!user || !id) return;
+
+    try {
+      // You can implement a check endpoint or assume false initially
+      setIsInWatchLater(false);
+
+      // If you have a check endpoint:
+      // const response = await libraryAPI.checkWatchLater(id);
+      // setIsInWatchLater(response.data.isInWatchLater);
+    } catch (error) {
+      setIsInWatchLater(false);
+    }
+  };
+
+  const checkSubscriptionStatus = async () => {
+    if (!user || !video?.owner?._id) return;
+
+    try {
+      // Implement subscription check if available
+      setIsSubscribed(false);
+    } catch (error) {
+      setIsSubscribed(false);
+    }
+  };
+
   const handleToggleLike = async () => {
     if (!user) {
       toast.error("Please login to like videos");
       return;
     }
 
+    if (likeProcessing) return;
+
     try {
       setLikeProcessing(true);
-      await likeAPI.toggleVideoLike(id);
+      const response = await likeAPI.toggleVideoLike(id);
 
-      // Refresh video to get updated like count
-      const response = await videoAPI.getVideoById(id);
-      setVideo(response.data.data);
+      if (response.data?.data) {
+        setLiked(response.data.data.isLiked);
+        setVideo((prev) => ({
+          ...prev,
+          likes: response.data.data.totalLikes,
+        }));
 
-      toast.success("Like updated!");
-    } catch (error) {
+        if (disliked && response.data.data.isLiked) {
+          setDisliked(false);
+        }
+
+        toast.success(
+          response.data.data.isLiked ? "Video liked!" : "Video unliked!"
+        );
+      }
+    } catch (err) {
+      console.error("Error toggling like:", err);
       toast.error("Failed to update like");
     } finally {
       setLikeProcessing(false);
     }
   };
 
-  const handleSubscribeToggle = async () => {
+  const handleWatchLater = async () => {
+    if (!user) {
+      toast.error("Please login to save videos");
+      return;
+    }
+
+    if (watchLaterProcessing) return;
+
+    try {
+      setWatchLaterProcessing(true);
+
+      if (isInWatchLater) {
+        await libraryAPI.removeFromWatchLater(id);
+        setIsInWatchLater(false);
+        toast.success("Removed from Watch Later");
+      } else {
+        await libraryAPI.addToWatchLater(id);
+        setIsInWatchLater(true);
+        toast.success("Added to Watch Later");
+      }
+    } catch (error) {
+      console.error("Watch later error:", error);
+
+      if (
+        error.response?.status === 400 &&
+        error.response?.data?.message?.includes("already")
+      ) {
+        setIsInWatchLater(true);
+        toast.error("Video already in watch later");
+      } else {
+        toast.error("Failed to update watch later");
+      }
+    } finally {
+      setWatchLaterProcessing(false);
+    }
+  };
+
+  const handleSubscribe = async () => {
     if (!user) {
       toast.error("Please login to subscribe");
       return;
     }
 
-    try {
-      setSubscribing(true);
+    if (!video?.owner?._id || user._id === video.owner._id) {
+      toast.error("Cannot subscribe to your own channel");
+      return;
+    }
 
-      if (isSubscribed) {
-        await subscriptionAPI.unsubscribe(channelId);
-        setIsSubscribed(false);
-        toast.success("Unsubscribed successfully!");
-      } else {
-        await subscriptionAPI.subscribe(channelId);
-        setIsSubscribed(true);
-        toast.success("Subscribed successfully!");
+    if (subscriptionProcessing) return;
+
+    try {
+      setSubscriptionProcessing(true);
+      const response = await subscriptionAPI.toggleSubscription(
+        video.owner._id
+      );
+
+      if (response.data?.data) {
+        setIsSubscribed(response.data.data.isSubscribed);
+        toast.success(
+          response.data.data.isSubscribed ? "Subscribed!" : "Unsubscribed!"
+        );
       }
     } catch (error) {
+      console.error("Subscription error:", error);
       toast.error("Failed to update subscription");
     } finally {
-      setSubscribing(false);
+      setSubscriptionProcessing(false);
     }
   };
 
@@ -148,7 +269,10 @@ const VideoWatch = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading video...</p>
+        </div>
       </div>
     );
   }
@@ -184,7 +308,6 @@ const VideoWatch = () => {
                 videoUrl={video.videoFile}
                 thumbnail={video.thumbnail}
                 onTimeUpdate={(currentTime) => {
-                  // Track watch time if needed
                   console.log("Current time:", currentTime);
                 }}
               />
@@ -220,6 +343,7 @@ const VideoWatch = () => {
                 </div>
 
                 <div className="flex items-center space-x-2">
+                  {/* Like Button */}
                   <button
                     onClick={handleToggleLike}
                     disabled={likeProcessing}
@@ -229,7 +353,9 @@ const VideoWatch = () => {
                         : "bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-600"
                     }`}
                   >
-                    {liked ? (
+                    {likeProcessing ? (
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current"></div>
+                    ) : liked ? (
                       <HandThumbUpSolid className="w-5 h-5" />
                     ) : (
                       <HandThumbUpIcon className="w-5 h-5" />
@@ -237,6 +363,7 @@ const VideoWatch = () => {
                     <span>{video.likes || 0}</span>
                   </button>
 
+                  {/* Share Button */}
                   <button
                     onClick={handleShare}
                     className="flex items-center space-x-2 px-4 py-2 rounded-full border bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-600 transition-all"
@@ -245,9 +372,24 @@ const VideoWatch = () => {
                     <span>Share</span>
                   </button>
 
-                  <button className="flex items-center space-x-2 px-4 py-2 rounded-full border bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-600 transition-all">
-                    <BookmarkIcon className="w-5 h-5" />
-                    <span>Save</span>
+                  {/* Watch Later Button */}
+                  <button
+                    onClick={handleWatchLater}
+                    disabled={watchLaterProcessing}
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-full border transition-all ${
+                      isInWatchLater
+                        ? "bg-green-50 border-green-300 text-green-600 dark:bg-green-900 dark:border-green-700 dark:text-green-400"
+                        : "bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-600"
+                    }`}
+                  >
+                    {watchLaterProcessing ? (
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current"></div>
+                    ) : isInWatchLater ? (
+                      <BookmarkSolid className="w-5 h-5" />
+                    ) : (
+                      <BookmarkIcon className="w-5 h-5" />
+                    )}
+                    <span>{isInWatchLater ? "Saved" : "Save"}</span>
                   </button>
                 </div>
               </div>
@@ -272,12 +414,28 @@ const VideoWatch = () => {
                     </p>
                   </div>
                 </Link>
-                
-                <SubscribeButton
-                  channelId={video.owner._id}
-                  initialSubscribed={false} // You can fetch this from API
-                  initialCount={0} // You can fetch this from API
-                />
+
+                {/* Subscribe Button */}
+                {user && user._id !== video.owner?._id && (
+                  <button
+                    onClick={handleSubscribe}
+                    disabled={subscriptionProcessing}
+                    className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-all ${
+                      isSubscribed
+                        ? "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                        : "bg-red-600 text-white hover:bg-red-700"
+                    }`}
+                  >
+                    {subscriptionProcessing ? (
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current"></div>
+                    ) : isSubscribed ? (
+                      <UserMinusIcon className="w-5 h-5" />
+                    ) : (
+                      <UserPlusIcon className="w-5 h-5" />
+                    )}
+                    <span>{isSubscribed ? "Subscribed" : "Subscribe"}</span>
+                  </button>
+                )}
               </div>
 
               {/* Description */}

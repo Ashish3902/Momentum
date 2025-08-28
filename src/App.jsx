@@ -24,7 +24,7 @@ import Subscriptions from "./pages/Subscriptions.jsx";
 import Trending from "./pages/Trending.jsx";
 import History from "./pages/History.jsx";
 import WatchLater from "./pages/WatchLater.jsx";
-
+import LikedVideos from "./pages/LikedVideos.jsx";
 // Placeholder pages for remaining routes
 const TrendingPage = () => (
   <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
@@ -150,6 +150,14 @@ function App() {
                     element={
                       <ProtectedRoute>
                         <History />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/liked-videos"
+                    element={
+                      <ProtectedRoute>
+                        <LikedVideos />
                       </ProtectedRoute>
                     }
                   />
