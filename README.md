@@ -1,4 +1,4 @@
-# Fun – Futuristic Social Media UI
+# vidora – Futuristic Social Media UI
 
 A modern, sleek social media web app with a dark + neon gradient theme, glassmorphism panels, and smooth micro-animations.
 
