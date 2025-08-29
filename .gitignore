@@ -92,3 +92,7 @@ venv/
 # Ignore backup/commented versions of files
 *_commented.js
 *_notes.py
+node_modules/
+dist/
+build/
+.env
