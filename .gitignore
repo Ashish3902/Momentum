@@ -85,3 +85,10 @@ venv/
 *.7z
 *.bak
 *.tmp
+# Ignore all text/notes files
+*.txt
+*.md
+
+# Ignore backup/commented versions of files
+*_commented.js
+*_notes.py
