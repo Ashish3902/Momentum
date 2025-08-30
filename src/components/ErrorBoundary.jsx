@@ -4,11 +4,11 @@ import React from "react";
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, error: null };
   }
 
   static getDerivedStateFromError(error) {
-    return { hasError: true };
+    return { hasError: true, error };
   }
 
   componentDidCatch(error, errorInfo) {
@@ -18,23 +18,21 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold mb-4">Something went wrong</h1>
-            <p className="text-gray-600 mb-4">
-              Please refresh the page and try again
-            </p>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+          <div className="bg-black/30 backdrop-blur-xl border border-white/10 rounded-xl p-8 max-w-md">
+            <h2 className="text-xl font-semibold text-white mb-4">
+              Something went wrong
+            </h2>
             <button
               onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              className="px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg text-white hover:shadow-lg hover:shadow-blue-500/25 transition-all"
             >
-              Refresh Page
+              Reload Page
             </button>
           </div>
         </div>
       );
     }
-
     return this.props.children;
   }
 }

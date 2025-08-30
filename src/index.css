@@ -1,24 +1,4 @@
-/* src/index.css */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Custom styles */
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 4px;
-}
-
-.video-player {
-  background: #000;
-  border-radius: 8px;
-  overflow: hidden;
-}
