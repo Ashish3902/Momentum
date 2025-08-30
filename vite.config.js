@@ -1,19 +1,29 @@
+// vite.config.js
 import { defineConfig } from "vite";
-import path from "path";
-import tailwindcss from "tailwindcss";
-import autoprefixer from "autoprefixer";
+import react from "@vitejs/plugin-react";
 
-// https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
+  plugins: [react()],
+  build: {
+    outDir: "dist",
+    sourcemap: false,
+    minify: "terser",
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ["react", "react-dom"],
+          router: ["react-router-dom"],
+          ui: ["framer-motion", "react-hot-toast", "@heroicons/react"],
+        },
+      },
     },
   },
-  css: {
-    postcss: {
-      plugins: [tailwindcss, autoprefixer],
-    },
+  server: {
+    port: 3000,
+    open: true,
+  },
+  preview: {
+    port: 4173,
+    host: true,
   },
 });
