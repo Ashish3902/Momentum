@@ -133,7 +133,7 @@ const About = () => {
             className="mb-8"
           >
             <img
-              src="c:\Users\asmun\OneDrive\Desktop\图片\WhatsApp Image 2025-07-04 at 21.17.20_46b942f4.jpg"
+              src="C:\Users\asmun\OneDrive\文档\Fun\f\public\ashishim.jpg"
               alt="Ashish Sharma"
               className="w-32 h-32 rounded-full mx-auto shadow-xl border-4 border-white dark:border-gray-700"
             />
